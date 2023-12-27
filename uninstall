@@ -1,0 +1,18 @@
+#!/bin/bash
+
+source $WS_CFG_PATH/ws-shared
+
+main () {
+	_ws_log verbose "Unlinking script ..."
+
+	if [ -e "${WS_CFG_PATH}/bin/qpaeq-ctl" ]; then
+		_ws_log verbose "Removing '${WS_CFG_PATH}/bin/qpaeq-ctl' ..."
+		rm "${WS_CFG_PATH}/bin/qpaeq-ctl"
+	else
+		_ws_log warning "qpaeq-ctl was not installed. Skipping."
+	fi
+
+	return 0
+}
+
+main $*

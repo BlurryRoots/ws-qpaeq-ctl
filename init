@@ -1,0 +1,23 @@
+#!/bin/bash
+
+source $WS_CFG_PATH/ws-shared
+
+main () {
+	_ws_log verbose "Checking if script is installed properly ..."
+	
+	local exit_code=0
+	if which qpaeq-ctl > /dev/null; then
+		qpaeq-ctl is-active 2>&1 > /dev/null
+		if [ 1 -lt $? ]; then
+			_ws_log error "Could not call 'qpaeq-ctl is-active'."
+			exit_code=127
+		fi
+	else
+		_ws_log error "Could not find 'qpaeq-ctl'. Installtion of qpaeq-ctl seems corrupted."
+		exit_code=127
+	fi
+
+	return exit_code
+}
+
+main $*
