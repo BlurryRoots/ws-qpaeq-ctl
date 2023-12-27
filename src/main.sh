@@ -71,8 +71,11 @@ qpaeq-ctl () {
 		return 1
 	fi
 
+	local selfabs="${0}"
+	local self="$(basename ${selfabs})"
+	local cmd="${1}"
 	local configfile="${HOME}/.config/pulse/default.pa"
-	local cachefile="${HOME}/.config/pulse/$(basename $0).cache"
+	local cachefile="${HOME}/.config/pulse/${self}.cache"
 	local module_sink=module-equalizer-sink
 	local module_dbus=module-dbus-protocol
 	local python_split_src="
@@ -89,26 +92,28 @@ sys.stdout.write(f'{r[0]}')
 exit(0)
 "
 
-	case $1 in
+	case ${cmd} in
 		activate)
-			$0 is-active > /dev/null && {
+			${selfabs} is-active > /dev/null && {
 				echo "Equalizer already active."
 				return 1
 			}
 
 			echo "Checking modules ..."
-			if ! $0 modules-load; then
+			if ! ${selfabs} modules-load; then
 				echo "Aborting ..."
 				return 1
 			fi
 
-			if ! $0 get-equalizer-sink > /dev/null; then
+			if ! ${selfabs} get-equalizer-sink > /dev/null; then
 				echo "Cannot find equalizer sink."
 				return 1
 			fi
 
-			local equalizersink="$($0 get-equalizer-sink)"
-			local activesink="$(pactl info | grep -i "default sink" | awk '{ print $3 }')"
+			local equalizersink="$(${selfabs} get-equalizer-sink)"
+			local activesink="$(pactl info \
+				| grep -i "default sink" \
+				| awk '{ print $3 }')"
 			
 			if [ 0 -eq ${#activesink} ]; then
 				echo "Error: Could not find any active/default sink!"
@@ -128,7 +133,7 @@ exit(0)
 		deactivate)
 			local deactivated=0
 
-			if $0 is-active > /dev/null; then
+			if ${selfabs} is-active > /dev/null; then
 				local defaultsink=""
 
 				if [ -e ${cachefile} ]; then
@@ -136,7 +141,8 @@ exit(0)
 					defaultsink=$(cat ${cachefile})
 				else
 					echo "Using first available sink ..."
-					defaultsink="$(pactl list sinks short | awk '/0\t/ { print $2 }')"
+					defaultsink="$(pactl list sinks short \
+						| awk '/0\t/ { print $2 }')"
 				fi
 
 				echo "Changing sink to: ${defaultsink} ..."
@@ -144,21 +150,27 @@ exit(0)
 					echo "Panic!"
 					return 1
 				fi
+			
+				echo "Unloading modules ..."
+				${selfabs} modules-unload
 			else
-				local activesink="$(pactl info | grep -i "default sink" | awk '{ print $3 }')"
+				local activesink="$(pactl info \
+					| grep -i "default sink" \
+					| awk '{ print $3 }' \
+				)"
 				echo "Equalizer not active. (Active sink: ${activesink})"
 				deactivated=1
 			fi
-			
-			echo "Unloading modules ..."
-			$0 modules-unload
 
 			return ${deactivated}
 		;;
 
 		is-active)
-			local equalizersink="$($0 get-equalizer-sink)"
-			local activesink="$(pactl info | grep -i "default sink" | awk '{ print $3 }')"
+			local equalizersink="$(${selfabs} get-equalizer-sink)"
+			local activesink="$(pactl info \
+				| grep -i "default sink" \
+				| awk '{ print $3 }' \
+			)"
 			
 			[[ ${activesink} == ${equalizersink} ]] && {
 				echo "Equalizer active."
@@ -170,10 +182,14 @@ exit(0)
 		;;
 
 		get-equalizer-sink)
-			local equalizersink="$(pactl list sinks short | awk '/equalizer/ { print $2 }')"
+			local equalizersink="$(pactl list sinks short \
+				| awk '/equalizer/ { print $2 }' \
+			)"
 			echo ${equalizersink}
 
-			[ 0 -eq ${#equalizersink} ] && return 1
+			if [ 0 -eq ${#equalizersink} ]; then
+				return 1
+			fi
 			
 			return 0
 		;;
@@ -217,12 +233,12 @@ exit(0)
 		;;
 
 		open)
-			if ! $0 is-active > /dev/null; then
+			if ! ${selfabs} is-active > /dev/null; then
 				echo "Equalizer not activated."
 				return 1
 			fi
 
-			if $0 get-pid > /dev/null; then
+			if ${selfabs} get-pid > /dev/null; then
 				echo "GUI application already running."
 				return 1
 			fi
@@ -238,7 +254,7 @@ exit(0)
 		;;
 
 		close)
-			local qpaeqpid="$($0 get-pid)"
+			local qpaeqpid="$(${selfabs} get-pid)"
 
 			if [ 0 -eq ${#qpaeqpid} ]; then
 				echo "Could not find any qpaeq instance running."
@@ -267,7 +283,7 @@ exit(0)
 		;;
 
 		install)
-			if ! $0 modules-load; then
+			if ! ${selfabs} modules-load; then
 				echo "Error: Cannot load equalizer module. Aborting."
 				return 1
 			fi
@@ -317,23 +333,20 @@ exit(0)
 		;;
 
 		*)
-			local usage=$(cat <<-END
-				USAGE: $0 <options> [command] [arguments]
-				commands:
-				\tactivate
-				\tdeactivate
-				\tis-active
-				\tget-equalizer-sink
-				\tmodules-load
-				\tmodules-unload
-				\topen
-				\tclose
-				\tinstall
-				\tuninstall
-			END
-			)
+			local usage="USAGE: ${self} <options> [command] [arguments]"
+			usage="${usage}\ncommands:"
+			usage="${usage}\n\tactivate"
+			usage="${usage}\n\tdeactivate"
+			usage="${usage}\n\tis-active"
+			usage="${usage}\n\tget-equalizer-sink"
+			usage="${usage}\n\tmodules-load"
+			usage="${usage}\n\tmodules-unload"
+			usage="${usage}\n\topen"
+			usage="${usage}\n\tclose"
+			usage="${usage}\n\tinstall"
+			usage="${usage}\n\tuninstall"
 
-			echo $usage
+			printf "%b" "${usage}"
 
 			return 1
 		;;
